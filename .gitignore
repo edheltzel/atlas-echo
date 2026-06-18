@@ -6,6 +6,9 @@ claudecode/.claude/PAI/USER/Voice/logs/
 *.log
 /tmp/
 
+# Local agent scratch / draft issues (promoted to GitHub Issues, not committed)
+.scratch/
+
 # Audio (runtime artifacts)
 *.mp3
 *.wav

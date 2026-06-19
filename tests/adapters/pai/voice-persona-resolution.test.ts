@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolvePersonaKey, selectVoice } from "../../../adapters/pai/hooks/handlers/VoiceNotification";
+import { buildVoicePayload, resolvePersonaKey, selectVoice } from "../../../adapters/pai/hooks/handlers/VoiceNotification";
 import { parseTranscript } from "../../../adapters/pai/hooks/lib/TranscriptParser";
 import type { Identity } from "../../../adapters/pai/hooks/lib/identity";
 import type { ParsedTranscript } from "../../../adapters/pai/hooks/lib/TranscriptParser";
@@ -16,6 +16,9 @@ const ATLAS: Identity = {
   color: "#3B82F6",
   voice: { stability: 0.5, similarity_boost: 0.75, style: 0.0, speed: 1.0, use_speaker_boost: true },
 };
+
+// Explicit known-agents set so selectVoice tests don't depend on voices.json on disk.
+const KNOWN = new Set(["themis", "engineer", "qa-tester"]);
 
 function parsedWith(currentResponseText: string, lastMessage = ""): ParsedTranscript {
   return {
@@ -42,6 +45,30 @@ describe("resolvePersonaKey — persona detection from the 🗣️ speaker tag",
     expect(resolvePersonaKey("🗣️ qa-tester: verifying the flow.", "Atlas")).toBe("qa-tester");
   });
 
+  test("normalizes casing to a lowercase key", () => {
+    expect(resolvePersonaKey("🗣️ THEMIS: go.", "Atlas")).toBe("themis");
+    expect(resolvePersonaKey("🗣️ Themis: go.", "Atlas")).toBe("themis");
+  });
+
+  test("tolerates a missing space after the emoji", () => {
+    expect(resolvePersonaKey("🗣️Themis: go.", "Atlas")).toBe("themis");
+  });
+
+  test("tolerates an indented voice line (list item)", () => {
+    expect(resolvePersonaKey("- summary\n  🗣️ Themis: go.", "Atlas")).toBe("themis");
+  });
+
+  test("returns null for an empty/malformed tag", () => {
+    expect(resolvePersonaKey("🗣️ : nothing here", "Atlas")).toBeNull();
+    expect(resolvePersonaKey("🗣️ 123: digits first", "Atlas")).toBeNull();
+  });
+
+  test("does NOT match an inline mention/quote (must begin its own line)", () => {
+    // An Atlas turn that merely references a tag inside a sentence must not flip voice.
+    expect(resolvePersonaKey("I will brief 🗣️ Themis: do the thing — inline mention.", "Atlas")).toBeNull();
+    expect(resolvePersonaKey("The hook reads the `🗣️ Themis:` tag from the response.", "Atlas")).toBeNull();
+  });
+
   test("returns null for the DA's own line (Atlas path)", () => {
     expect(resolvePersonaKey("🗣️ Atlas: task complete.", "Atlas")).toBeNull();
   });
@@ -66,8 +93,8 @@ describe("resolvePersonaKey — persona detection from the 🗣️ speaker tag",
 });
 
 describe("selectVoice — what the Stop-hook path sends to the voice server", () => {
-  test("persona active → sends the resolvable persona key, NOT the hardcoded mainDAVoiceID", () => {
-    const sel = selectVoice(parsedWith("🗣️ Themis: coordinating."), ATLAS);
+  test("known persona → sends the resolvable persona key, NOT the hardcoded mainDAVoiceID", () => {
+    const sel = selectVoice(parsedWith("🗣️ Themis: coordinating."), ATLAS, KNOWN);
     expect(sel.voiceId).toBe("themis");
     expect(sel.voiceId).not.toBe(ATLAS.mainDAVoiceID);
     // Persona delegates prosody to the daemon's per-agent config.
@@ -75,22 +102,68 @@ describe("selectVoice — what the Stop-hook path sends to the voice server", ()
     expect(sel.speaker).toBe("themis");
   });
 
+  test("UNKNOWN persona key → DA voice fallback, never an unresolvable key (would be Ava)", () => {
+    // "Gandalf" is not in voices.json — sending it would resolve to null → daemon
+    // default (Ava) = the exact #27 bug. selectVoice must fall back to the DA voice.
+    const sel = selectVoice(parsedWith("🗣️ Gandalf: you shall not pass."), ATLAS, KNOWN);
+    expect(sel.voiceId).toBe(ATLAS.mainDAVoiceID);
+    expect(sel.voiceSettings).toBe(ATLAS.voice);
+    expect(sel.speaker).toBe("Atlas");
+  });
+
+  test("inline/quoted tag in an Atlas turn → DA voice (no hijack)", () => {
+    const text = "The hook reads the `🗣️ Themis:` tag inline. No real voice line here.";
+    const sel = selectVoice(parsedWith(text), ATLAS, KNOWN);
+    expect(sel.voiceId).toBe(ATLAS.mainDAVoiceID);
+    expect(sel.speaker).toBe("Atlas");
+  });
+
   test("Atlas / no persona → byte-for-byte the previous DA voice path (regression guard)", () => {
-    const sel = selectVoice(parsedWith("🗣️ Atlas: task complete."), ATLAS);
+    const sel = selectVoice(parsedWith("🗣️ Atlas: task complete."), ATLAS, KNOWN);
     expect(sel.voiceId).toBe(ATLAS.mainDAVoiceID);
     expect(sel.voiceSettings).toBe(ATLAS.voice);
     expect(sel.speaker).toBe("Atlas");
   });
 
   test("no voice line at all → DA voice path (unchanged)", () => {
-    const sel = selectVoice(parsedWith("Plain response, no tag."), ATLAS);
+    const sel = selectVoice(parsedWith("Plain response, no tag."), ATLAS, KNOWN);
     expect(sel.voiceId).toBe(ATLAS.mainDAVoiceID);
     expect(sel.speaker).toBe("Atlas");
   });
 
   test("falls back to lastMessage when currentResponseText is empty", () => {
-    const sel = selectVoice(parsedWith("", "🗣️ Engineer: building it."), ATLAS);
+    const sel = selectVoice(parsedWith("", "🗣️ Engineer: building it."), ATLAS, KNOWN);
     expect(sel.voiceId).toBe("engineer");
+  });
+});
+
+describe("buildVoicePayload — the exact payload sent to the voice server", () => {
+  test("persona selection → name key, persona title, no Atlas prosody", () => {
+    const payload = buildVoicePayload("Dispatching the worker.", "sess-1", { voiceId: "themis", speaker: "themis" });
+    expect(payload.voice_id).toBe("themis");
+    expect(payload.title).toBe("themis says");
+    expect(payload.voice_settings).toBeUndefined();
+    expect(payload.voice_enabled).toBe(true);
+    expect(payload.source).toBe("pai");
+    expect(payload.session_id).toBe("sess-1");
+    expect(payload.message).toBe("Dispatching the worker.");
+  });
+
+  test("DA selection → mainDAVoiceID, Atlas title, prosody applied", () => {
+    const payload = buildVoicePayload("Shipped the fix.", "sess-2", {
+      voiceId: ATLAS.mainDAVoiceID,
+      voiceSettings: ATLAS.voice,
+      speaker: ATLAS.name,
+    });
+    expect(payload.voice_id).toBe(ATLAS.mainDAVoiceID);
+    expect(payload.title).toBe("Atlas says");
+    expect(payload.voice_settings).toEqual({
+      stability: 0.5,
+      similarity_boost: 0.75,
+      style: 0.0,
+      speed: 1.0,
+      use_speaker_boost: true,
+    });
   });
 });
 

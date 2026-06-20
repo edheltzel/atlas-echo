@@ -170,12 +170,16 @@ async function sendNotification(payload: ElevenLabsNotificationPayload, sessionI
  *
  * A main-session persona (e.g. adopting `/Themis`) is NOT a Task subagent, so
  * no env var signals it. The reliable per-turn signal is the response itself:
- * by the PAI MODES contract, the `🗣️ <Name>:` voice line is always the FINAL
- * line of the response. So we honor ONLY a tag on the last non-blank line — and
- * we first strip fenced ``` code blocks, so a demonstrated/quoted voice line in
- * a code fence or list (pervasive in this repo's own docs) can NEVER win, even
- * when the turn ends inside or right after the fence. Returns the lowercase
- * name, or null when the speaker is the DA (Atlas) or there is no voice line.
+ * by the PAI MODES contract, the `🗣️ <Name>:` voice line is the FINAL line of
+ * the response and sits at column 0 (a genuine voice line is never indented).
+ *
+ * We parse line-by-line (not regex over the whole string, which is fragile):
+ *  - track fenced-code state with a delimiter toggle (``` and ~~~), so lines in
+ *    a code block are ignored regardless of balance/closure;
+ *  - treat Markdown indented code blocks (≥4 leading spaces or a tab) as code;
+ *  - take the last non-blank, non-code line and accept a 🗣️ <Name>: tag only at
+ *    column 0. So a demonstrated/quoted voice line (in a fence, indented block,
+ *    list, or prose) can never win — pervasive in this repo's own docs.
  *
  * Self-cleaning: the moment the model stops emitting `🗣️ Themis:`, the next
  * turn resolves to null and reverts to the DA voice. No marker/registry state.
@@ -186,20 +190,28 @@ async function sendNotification(payload: ElevenLabsNotificationPayload, sessionI
  */
 export function resolvePersonaKey(text: string, daName: string): string | null {
   if (!text) return null;
-  // Remove fenced code blocks (balanced, plus any trailing unclosed fence) so a
-  // demonstrated voice line inside ``` is never considered.
-  const stripped = text
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/```[\s\S]*$/, '');
-  // The voice line is the final line of the turn — find the last non-blank line.
-  const lines = stripped.split('\n');
-  let lastLine = '';
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (lines[i].trim()) { lastLine = lines[i]; break; }
+
+  let fenceChar: string | null = null; // '`' or '~' while inside a fenced block
+  let lastContentLine: string | null = null;
+
+  for (const line of text.split('\n')) {
+    // A fence delimiter line: up to 3 leading spaces then ≥3 ` or ~ (CommonMark).
+    const fence = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (fence) {
+      const ch = fence[1][0];
+      if (fenceChar === null) fenceChar = ch;        // open
+      else if (fenceChar === ch) fenceChar = null;   // close (same delimiter type)
+      continue;                                       // delimiter lines are never content
+    }
+    if (fenceChar !== null) continue;                 // inside a fenced block → code
+    if (/^(?: {4,}|\t)/.test(line)) continue;         // indented code block → code
+    if (!line.trim()) continue;                       // blank
+    lastContentLine = line;
   }
-  // Match a 🗣️ <Name>: tag that begins that line (optional indent/bold), so an
-  // inline mention or a list/quote prefix (e.g. "- 🗣️ …") does not match.
-  const match = lastLine.match(/^[ \t]*🗣️[ \t]*\*{0,2}([A-Za-z][A-Za-z0-9_-]*)\*{0,2}[ \t]*:/);
+
+  if (lastContentLine === null) return null;
+  // Column 0 only — no leading-whitespace allowance.
+  const match = lastContentLine.match(/^🗣️[ \t]*\*{0,2}([A-Za-z][A-Za-z0-9_-]*)\*{0,2}[ \t]*:/);
   if (!match) return null;
   const name = match[1].toLowerCase();
   if (!name || name === daName.toLowerCase()) return null;

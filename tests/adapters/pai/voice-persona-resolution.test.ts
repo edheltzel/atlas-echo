@@ -60,8 +60,9 @@ describe("resolvePersonaKey — persona detection from the 🗣️ speaker tag",
     expect(resolvePersonaKey("🗣️Themis: go.", "Atlas")).toBe("themis");
   });
 
-  test("tolerates an indented voice line (list item)", () => {
-    expect(resolvePersonaKey("- summary\n  🗣️ Themis: go.", "Atlas")).toBe("themis");
+  test("an indented 🗣️ line is NOT a voice line (must be column 0)", () => {
+    // A genuine PAI voice line is never indented; indentation signals a demo/quote.
+    expect(resolvePersonaKey("- summary\n  🗣️ Themis: go.", "Atlas")).toBeNull();
   });
 
   test("returns null for an empty/malformed tag", () => {
@@ -124,6 +125,27 @@ describe("resolvePersonaKey — final-line anchoring (code fences / demos must n
 
   test("a real persona voice line as the final line still wins (with an earlier fenced demo)", () => {
     const text = `Reference:\n${FENCE}\n🗣️ Engineer: example\n${FENCE}\n🗣️ Themis: dispatching for real.`;
+    expect(resolvePersonaKey(text, "Atlas")).toBe("themis");
+  });
+
+  test("a 4-space indented 🗣️ demo does NOT win", () => {
+    expect(resolvePersonaKey("Format:\n\n    🗣️ Themis: demo", "Atlas")).toBeNull();
+  });
+
+  test("a tab-indented 🗣️ demo does NOT win", () => {
+    expect(resolvePersonaKey("Format:\n\n\t🗣️ Themis: demo", "Atlas")).toBeNull();
+  });
+
+  test("a ~~~ tilde-fenced demo does NOT win (closed and unclosed)", () => {
+    const TILDE = "~~~";
+    expect(resolvePersonaKey(`Example:\n${TILDE}\n🗣️ Themis: x\n${TILDE}\ndone.`, "Atlas")).toBeNull();
+    expect(resolvePersonaKey(`Example:\n${TILDE}\n🗣️ Themis: x`, "Atlas")).toBeNull();
+  });
+
+  test("inline ``` runs (not a fence delimiter) do NOT eat a real final voice line", () => {
+    // Regression for the greedy string-strip: a stray inline ``` must not demote
+    // the real persona voice line on the final line.
+    const text = `inline ${FENCE}code${FENCE} and ${FENCE} stray\n🗣️ Themis: real`;
     expect(resolvePersonaKey(text, "Atlas")).toBe("themis");
   });
 });

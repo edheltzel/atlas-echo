@@ -1,4 +1,4 @@
-# Adapters & PAI compatibility path
+# Adapters
 
 Adapters are out-of-process host integrations that translate host lifecycle events into
 `POST /notify` calls. They import nothing from `core/` and speak only the HTTP contract. See

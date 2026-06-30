@@ -5,9 +5,9 @@ PLIST_PATH="$HOME/Library/LaunchAgents/${SERVICE_NAME}.plist"
 
 if launchctl list 2>/dev/null | grep "$SERVICE_NAME" >/dev/null 2>&1; then
   launchctl unload "$PLIST_PATH" 2>/dev/null || true
-  echo "OK atlas-voicesystem stopped"
+  echo "OK atlas-echo stopped"
 else
-  echo "atlas-voicesystem is not loaded"
+  echo "atlas-echo is not loaded"
 fi
 
 if lsof -i :8888 >/dev/null 2>&1; then

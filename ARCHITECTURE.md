@@ -1,4 +1,4 @@
-# ARCHITECTURE — atlas-voicesystem
+# ARCHITECTURE — atlas-echo
 
 A codemap for agents. Start here to learn *where* things live and *what invariants*
 to respect; drill into [`AGENTS.md`](AGENTS.md) for commands and the [`docs/`](docs/)
@@ -6,7 +6,7 @@ pages for per-area detail.
 
 ## Bird's-eye view
 
-atlas-voicesystem is a Bun/TypeScript text-to-speech notification daemon built as a
+atlas-echo is a Bun/TypeScript text-to-speech notification daemon built as a
 **host-neutral core plus out-of-process host adapters**. One long-lived process
 (`core/server.ts`) listens on `localhost:8888` and exposes three HTTP endpoints
 (`POST /notify`, `POST /notify/personality`, `GET /health`). Any host — a Claude Code

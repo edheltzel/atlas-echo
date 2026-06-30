@@ -1,6 +1,6 @@
 # Pi Adapter
 
-Pi host adapter for atlas-voicesystem.
+Pi host adapter for atlas-echo.
 
 The adapter is a Pi package. It listens to Pi lifecycle events and translates them into `/notify` requests against the local voice server.
 

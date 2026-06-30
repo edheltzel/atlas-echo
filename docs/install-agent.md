@@ -18,7 +18,7 @@ If FAIL: install Bun from <https://bun.sh/>.
 bash scripts/install.sh --adapter none
 ```
 
-Expected: exits 0 and prints `OK atlas-voicesystem is healthy on :8888`.
+Expected: exits 0 and prints `OK atlas-echo is healthy on :8888`.
 
 If FAIL: inspect `~/Library/Logs/atlas-voicesystem.log`.
 

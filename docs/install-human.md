@@ -1,6 +1,6 @@
 # Human Install Guide
 
-This guide installs `atlas-voicesystem`, a local voice notification server for coding agents and scripts.
+This guide installs `atlas-echo`, a local voice notification server for coding agents and scripts.
 
 ## What gets installed
 
@@ -48,7 +48,7 @@ Inside Pi, `/voice-status` shows adapter configuration.
 curl -fsS http://localhost:8888/health
 curl -fsS -X POST http://localhost:8888/notify \
   -H 'Content-Type: application/json' \
-  -d '{"message":"Hello from atlas voicesystem"}'
+  -d '{"message":"Hello from atlas echo"}'
 ```
 
 The second command should speak aloud unless your provider chain is disabled or muted.

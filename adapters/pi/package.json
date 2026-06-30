@@ -1,7 +1,7 @@
 {
-  "name": "@atlas-voicesystem/pi-adapter",
+  "name": "@atlas-echo/pi-adapter",
   "version": "0.1.0",
-  "description": "Pi host adapter for atlas-voicesystem",
+  "description": "Pi host adapter for atlas-echo",
   "type": "module",
   "keywords": ["pi-package", "pi", "voice", "tts", "adapter"],
   "pi": {

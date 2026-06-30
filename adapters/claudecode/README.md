@@ -1,6 +1,6 @@
 # Claude Code Adapter
 
-Claude Code integration for atlas-voicesystem.
+Claude Code integration for atlas-echo.
 
 This adapter owns all Claude Code lifecycle glue:
 

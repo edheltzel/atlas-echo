@@ -14,7 +14,7 @@ usage() {
   cat <<EOF
 Usage: scripts/install.sh [--adapter none|claudecode|pi]
 
-Installs the universal atlas-voicesystem core as a macOS LaunchAgent.
+Installs the universal atlas-echo core as a macOS LaunchAgent.
 Adapter registration is optional and runs only after adapter preflight passes.
 EOF
 }
@@ -160,7 +160,7 @@ reload_core_service() {
   fi
 
   if curl --connect-timeout 2 --max-time 5 -fsS http://localhost:8888/health >/dev/null 2>&1; then
-    echo "OK atlas-voicesystem is healthy on :8888"
+    echo "OK atlas-echo is healthy on :8888"
   else
     echo "Voice server did not respond. Check logs: $LOG_PATH" >&2
     exit 1

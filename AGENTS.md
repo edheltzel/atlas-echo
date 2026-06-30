@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Lean entry point for agents working on `atlas-voicesystem`. This file is the build/test
+Lean entry point for agents working on `atlas-echo`. This file is the build/test
 commands, the repo map, the hard invariants, and the DOX rail. Architecture and per-area
 detail live behind the pointers below — load them on demand (progressive disclosure).
 

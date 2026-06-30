@@ -1,6 +1,6 @@
 # Dependency Graph
 
-`atlas-voicesystem` separates the voice server core from optional host adapters and optional TTS providers.
+`atlas-echo` separates the voice server core from optional host adapters and optional TTS providers.
 
 ## Required
 

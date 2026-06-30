@@ -1,4 +1,4 @@
-# atlas-voicesystem
+# atlas-echo
 
 Standalone, multi-provider TTS notification server for coding agents, terminals, and scripts.
 
@@ -75,7 +75,7 @@ Manual speak request:
 ```bash
 curl -X POST http://localhost:8888/notify \
   -H 'Content-Type: application/json' \
-  -d '{"message":"Hello from atlas voicesystem"}'
+  -d '{"message":"Hello from atlas echo"}'
 ```
 
 Silent smoke request:
